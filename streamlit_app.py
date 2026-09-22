@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import LabelEncoder
 
 st.set_page_config(page_title="Tech Layoffs Dashboard", layout="wide")
 
@@ -97,6 +99,85 @@ with pred_col2:
     plot_df = pd.concat([plot_df, pred_row])
     fig5 = px.line(plot_df, x="Year", y="Laid_Off", color="Type", markers=True)
     st.plotly_chart(fig5, use_container_width=True)
+
+st.divider()
+
+# ---------- Prediction Model: estimate layoffs for a company ----------
+st.subheader("🧮 Predict Layoffs for a Company")
+
+model_choice = st.radio(
+    "Choose a model",
+    ["Random Forest (predicts number laid off)", "Logistic Regression (predicts severity class)"],
+    horizontal=True,
+)
+
+model_df = df.dropna(subset=["Laid_Off", "Company_Size_before_Layoffs", "Industry", "Country", "Stage"]).copy()
+model_df["Company_Size_before_Layoffs"] = pd.to_numeric(
+    model_df["Company_Size_before_Layoffs"], errors="coerce"
+)
+model_df = model_df.dropna(subset=["Company_Size_before_Layoffs"])
+
+# Encode categorical features
+industry_enc = LabelEncoder().fit(model_df["Industry"])
+country_enc = LabelEncoder().fit(model_df["Country"])
+stage_enc = LabelEncoder().fit(model_df["Stage"])
+
+model_df["Industry_enc"] = industry_enc.transform(model_df["Industry"])
+model_df["Country_enc"] = country_enc.transform(model_df["Country"])
+model_df["Stage_enc"] = stage_enc.transform(model_df["Stage"])
+
+features = ["Company_Size_before_Layoffs", "Industry_enc", "Country_enc", "Stage_enc", "Year"]
+X_model = model_df[features]
+
+# Severity classes (low/medium/high) from tercile split of Laid_Off, used by Logistic Regression
+model_df["Severity"] = pd.qcut(model_df["Laid_Off"], q=3, labels=["Low", "Medium", "High"])
+
+with st.form("predict_form"):
+    st.write("Enter company details:")
+    f1, f2 = st.columns(2)
+    with f1:
+        in_size = st.number_input("Company size before layoffs", min_value=1, value=500)
+        in_industry = st.selectbox("Industry", sorted(model_df["Industry"].unique()))
+        in_year = st.number_input("Year", min_value=2020, max_value=2027, value=2026)
+    with f2:
+        in_country = st.selectbox("Country", sorted(model_df["Country"].unique()))
+        in_stage = st.selectbox("Stage", sorted(model_df["Stage"].unique()))
+    submitted = st.form_submit_button("Predict")
+
+if submitted:
+    row = pd.DataFrame([{
+        "Company_Size_before_Layoffs": in_size,
+        "Industry_enc": industry_enc.transform([in_industry])[0],
+        "Country_enc": country_enc.transform([in_country])[0],
+        "Stage_enc": stage_enc.transform([in_stage])[0],
+        "Year": in_year,
+    }])
+
+    if model_choice.startswith("Random Forest"):
+        rf = RandomForestRegressor(n_estimators=200, random_state=42)
+        rf.fit(X_model, model_df["Laid_Off"])
+        pred_layoffs = rf.predict(row)[0]
+        pred_pct = min(100, max(0, pred_layoffs / in_size * 100))
+        r1, r2 = st.columns(2)
+        r1.metric("Predicted employees laid off", f"{int(pred_layoffs):,}")
+        r2.metric("Predicted % of workforce", f"{pred_pct:.1f}%")
+        st.caption("Model: RandomForestRegressor on company size, industry, country, stage, and year.")
+    else:
+        clf = LogisticRegression(max_iter=1000)
+        clf.fit(X_model, model_df["Severity"])
+        pred_class = clf.predict(row)[0]
+        proba = clf.predict_proba(row)[0]
+        classes = clf.classes_
+        r1, r2 = st.columns(2)
+        r1.metric("Predicted severity", pred_class)
+        r2.metric("Confidence", f"{max(proba) * 100:.1f}%")
+        proba_df = pd.DataFrame({"Severity": classes, "Probability": proba})
+        fig6 = px.bar(proba_df, x="Severity", y="Probability")
+        st.plotly_chart(fig6, use_container_width=True)
+        st.caption("Model: LogisticRegression classifying layoff severity (Low/Medium/High tercile of "
+                   "historical Laid_Off counts) from company size, industry, country, stage, and year.")
+
+    st.caption("Trained on historical data — a simplified estimate, not a real forecast.")
 
 st.divider()
 st.subheader("Raw Data")
