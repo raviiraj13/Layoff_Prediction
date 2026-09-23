@@ -129,7 +129,7 @@ if submitted_sev:
     pred_class = clf.predict(row_sev)[0]
     st.metric("Predicted layoff scale", pred_class)
 
-    st.subheader("Confusion Matrix (on held-out test data)")
+    st.subheader("Confusion Matrix")
     labels = ["Small", "Moderate", "Large"]
     cm = confusion_matrix(y_test, y_pred_test, labels=labels)
     cm_df = pd.DataFrame(cm, index=[f"Actual: {l}" for l in labels], columns=[f"Predicted: {l}" for l in labels])
