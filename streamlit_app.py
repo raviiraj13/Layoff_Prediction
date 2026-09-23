@@ -77,10 +77,10 @@ st.divider()
 # ============================================================
 # SECTION 2: Severity prediction (classification, choice of algorithm)
 # ============================================================
-st.header("2️⃣ Severity Prediction")
-st.caption("Classifies expected layoffs into Low / Medium / High severity (terciles of historical layoff counts).")
+st.header("2️⃣ Layoff Scale Prediction")
+st.caption("Classifies expected layoffs as Small / Moderate / Large (terciles of historical layoff counts).")
 
-df["Severity"] = pd.qcut(df["Laid_Off"], q=3, labels=["Low", "Medium", "High"])
+df["Layoff_Scale"] = pd.qcut(df["Laid_Off"], q=3, labels=["Small", "Moderate", "Large"])
 
 ALGORITHMS = {
     "Logistic Regression": LogisticRegression(max_iter=1000),
@@ -94,21 +94,21 @@ algo_name = st.selectbox("Choose algorithm", list(ALGORITHMS.keys()))
 
 with st.form("severity_form"):
     row_sev, _ = company_input_form("sev")
-    submitted_sev = st.form_submit_button("Predict severity")
+    submitted_sev = st.form_submit_button("Predict layoff scale")
 
 if submitted_sev:
     clf = ALGORITHMS[algo_name]
-    clf.fit(X, df["Severity"])
+    clf.fit(X, df["Layoff_Scale"])
     pred_class = clf.predict(row_sev)[0]
     proba = clf.predict_proba(row_sev)[0]
     classes = clf.classes_
 
     r1, r2 = st.columns(2)
-    r1.metric("Predicted severity", pred_class)
+    r1.metric("Predicted layoff scale", pred_class)
     r2.metric("Confidence", f"{max(proba) * 100:.1f}%")
 
-    proba_df = pd.DataFrame({"Severity": classes, "Probability": proba})
-    fig = px.bar(proba_df, x="Severity", y="Probability")
+    proba_df = pd.DataFrame({"Layoff Scale": classes, "Probability": proba})
+    fig = px.bar(proba_df, x="Layoff Scale", y="Probability")
     st.plotly_chart(fig, use_container_width=True)
     st.caption(f"Model used: {algo_name}")
 
