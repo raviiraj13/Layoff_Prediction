@@ -140,4 +140,6 @@ if submitted_sev:
                "columns are what the model predicted — the diagonal is correct predictions.")
     st.caption(f"Model used: {algo_name}")
 
+
 st.caption("Trained on historical data — simplified estimates, not real forecasts.")
+st.dataframe(df)
