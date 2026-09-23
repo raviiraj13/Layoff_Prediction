@@ -142,4 +142,6 @@ if submitted_sev:
 
 
 st.caption("Trained on historical data — simplified estimates, not real forecasts.")
+
+st.header("LayOff Dataset")
 st.dataframe(df)
